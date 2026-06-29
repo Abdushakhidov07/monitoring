@@ -1,0 +1,55 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Find project
+        id: find
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem -Path . -Recurse -Filter FreeMon.csproj | Select-Object -First 1
+          if (-not $p) {
+            Write-Error "FreeMon.csproj not found. Upload the program files to the repo (Code tab)."
+            exit 1
+          }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "csproj=$($p.FullName)"
+          Write-Host "Found: $($p.FullName)"
+
+      - name: Build single exe
+        run: >
+          dotnet publish "${{ steps.find.outputs.csproj }}"
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o publish
+
+      - name: Download PresentMon (FPS)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/GameTechDev/PresentMon/releases/download/v1.10.0/PresentMon-1.10.0-x64.exe"
+          try { Invoke-WebRequest -Uri $url -OutFile "publish/PresentMon.exe" }
+          catch { Write-Warning "PresentMon download failed: $_" }
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeMon-win-x64
+          path: publish/
