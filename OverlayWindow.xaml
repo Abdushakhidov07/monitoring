@@ -11,23 +11,59 @@
         ResizeMode="NoResize"
         Left="40" Top="40">
 
-    <Border x:Name="RootBorder"
-            CornerRadius="6"
-            Padding="10,7"
-            Background="#80000000">
-        <ItemsControl x:Name="List"
-                      Foreground="Lime"
-                      FontSize="16"
-                      FontFamily="Consolas, Segoe UI, Arial">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding OverlayLine}" Margin="0,1">
-                        <TextBlock.Effect>
-                            <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="0" Opacity="0.95"/>
-                        </TextBlock.Effect>
-                    </TextBlock>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+    <Border x:Name="RootBorder" Width="300" CornerRadius="12" Padding="16,14"
+            Background="#EC13151A" BorderBrush="#22FFFFFF" BorderThickness="1">
+        <StackPanel>
+
+            <!-- Шапка -->
+            <Grid Margin="0,0,0,10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Border Width="28" Height="28" CornerRadius="8" Background="#23262E">
+                        <Path Data="M1,8 L4,8 L6,3 L8,13 L10,8 L13,8"
+                              Stroke="#EF9F27" StrokeThickness="1.5" Stretch="None"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TitleText" Text="FreeMon" FontSize="14" FontWeight="SemiBold" Foreground="#F4F5F7"/>
+                        <TextBlock Text="мониторинг железа" FontSize="11" Foreground="#7C828C"/>
+                    </StackPanel>
+                </StackPanel>
+                <Ellipse x:Name="LiveDot" Width="8" Height="8" Fill="#63A922"
+                         HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Блок FPS -->
+            <StackPanel x:Name="FpsBlock">
+                <Grid>
+                    <TextBlock Text="FPS" FontSize="13" Foreground="#9AA0AA"
+                               HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                    <TextBlock x:Name="FpsValue" Text="N/A" FontSize="30" FontWeight="SemiBold"
+                               Foreground="White" HorizontalAlignment="Right"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="среднее " FontSize="11" Foreground="#7C828C"/>
+                    <TextBlock x:Name="FpsAvg" Text="N/A" FontSize="11" Foreground="#BCC1C9"/>
+                    <TextBlock Text="   1% " FontSize="11" Foreground="#7C828C"/>
+                    <TextBlock x:Name="FpsLow1" Text="N/A" FontSize="11" Foreground="#BCC1C9"/>
+                    <TextBlock Text="   0.1% " FontSize="11" Foreground="#7C828C"/>
+                    <TextBlock x:Name="FpsLow01" Text="N/A" FontSize="11" Foreground="#BCC1C9"/>
+                </StackPanel>
+                <Canvas x:Name="GraphCanvas" Height="38" Margin="0,8,0,0" ClipToBounds="True"
+                        Background="Transparent">
+                    <Polygon x:Name="GraphFill" Fill="#1AEF9F27"/>
+                    <Polyline x:Name="GraphLine" Stroke="#EF9F27" StrokeThickness="1.5"/>
+                </Canvas>
+                <Border Height="1" Background="#16FFFFFF" Margin="0,12,0,0"/>
+            </StackPanel>
+
+            <!-- Секции по железу (заполняются из кода) -->
+            <StackPanel x:Name="GroupsHost" Margin="0,12,0,0"/>
+
+            <!-- Когда ничего не выбрано -->
+            <TextBlock x:Name="EmptyHint" Text="Выберите датчики в окне FreeMon"
+                       FontSize="12" Foreground="#6B7079" Visibility="Collapsed"
+                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
     </Border>
 </Window>

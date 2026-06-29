@@ -14,9 +14,9 @@ namespace FreeMon.Models
         public int IntervalMs { get; set; } = 1000;
 
         // Оформление оверлея
-        public double FontSize { get; set; } = 16;
-        public string TextColor { get; set; } = "Lime";
-        public double BackgroundOpacity { get; set; } = 0.5;
+        public double FontSize { get; set; } = 14;
+        public string TextColor { get; set; } = "White";
+        public double BackgroundOpacity { get; set; } = 0.9;
 
         // Позиция оверлея на экране
         public double OverlayLeft { get; set; } = 40;

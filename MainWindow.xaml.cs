@@ -8,6 +8,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using FreeMon.Interop;
@@ -32,11 +33,11 @@ namespace FreeMon
         private OverlayWindow? _overlay;
         private AppConfig _config = new();
 
-        private SensorItem _fpsItem = null!;
-        private SensorItem _frameItem = null!;
-
         private bool _fpsEnabled;
         private bool _loaded;
+
+        private readonly List<Border> _swatches = new();
+        private string _selectedColorName = "White";
 
         private static readonly string[] ColorNames =
             { "White", "Lime", "Cyan", "Yellow", "Orange", "Magenta", "Red", "LightGray" };
@@ -50,19 +51,18 @@ namespace FreeMon
 
         // ---------- жизненный цикл ----------
 
-        private void OnLoaded(object? sender, RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            foreach (string name in ColorNames)
-                ColorBox.Items.Add(name);
-
             bool fresh = !ConfigService.ConfigExists();
 
             BuildSensorList();
-            AddFpsItems();
+            BuildSwatches();
 
             _view = CollectionViewSource.GetDefaultView(_all);
             _view.Filter = FilterSensor;
-            SensorGrid.ItemsSource = _view;
+            if (_view.GroupDescriptions.Count == 0)
+                _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(SensorItem.HardwareName)));
+            SensorList.ItemsSource = _view;
 
             _config = ConfigService.Load();
             ApplyConfig();
@@ -96,21 +96,6 @@ namespace FreeMon
         {
             _monitor.Update();
             AddOrUpdate();
-        }
-
-        private void AddFpsItems()
-        {
-            _fpsItem = new SensorItem("fps/overall", "Игра (активное окно)", "FPS",
-                                      "FPS", SensorType.Load, ValueKind.Fps);
-            _frameItem = new SensorItem("fps/frametime", "Игра (активное окно)", "FPS",
-                                        "Frametime", SensorType.Load, ValueKind.FrameTime);
-
-            foreach (SensorItem it in new[] { _fpsItem, _frameItem })
-            {
-                it.PropertyChanged += Item_PropertyChanged;
-                _byId[it.Id] = it;
-                _all.Add(it);
-            }
         }
 
         private void AddOrUpdate()
@@ -162,16 +147,18 @@ namespace FreeMon
                         _fps.StartFor(pid);
                 }
 
-                double fps = _fps.Fps;
-                double ft = _fps.FrameTimeMs;
-                _fpsItem.Value = fps > 0 ? fps : (double?)null;
-                _frameItem.Value = ft > 0 ? ft : (double?)null;
-                FpsStatus.Text = _fps.Status;
+                FpsStats st = _fps.GetStats();
+                double[] graph = _fps.GetGraph(80);
+
+                FpsStatus.Text = st.HasData
+                    ? Math.Round(st.Current) + " FPS · 1% " + Math.Round(st.Low1) + " · " + _fps.Status
+                    : _fps.Status;
+
+                _overlay?.UpdateFps(new FpsStatsView(
+                    st.HasData, st.Current, st.Average, st.Low1, st.Low01, graph));
             }
             else
             {
-                _fpsItem.Value = null;
-                _frameItem.Value = null;
                 FpsStatus.Text = "FPS выключен";
             }
         }
@@ -219,17 +206,6 @@ namespace FreeMon
             SaveConfig();
         }
 
-        private void IntervalBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (int.TryParse(IntervalBox.Text, out int ms))
-            {
-                ms = Math.Max(200, Math.Min(10000, ms));
-                IntervalBox.Text = ms.ToString();
-                _timer.Interval = TimeSpan.FromMilliseconds(ms);
-                if (_loaded) SaveConfig();
-            }
-        }
-
         // ---------- FPS ----------
 
         private void FpsCheck_Changed(object sender, RoutedEventArgs e)
@@ -247,7 +223,83 @@ namespace FreeMon
                 _fps.Stop();
             }
 
+            _overlay?.SetFpsVisible(_fpsEnabled);
+
             if (_loaded) SaveConfig();
+        }
+
+        // ---------- слайдеры оформления ----------
+
+        private void OverlayStyleChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (FontVal != null && FontSizeSlider != null)
+                FontVal.Text = ((int)Math.Round(FontSizeSlider.Value)).ToString();
+            if (OpacityVal != null && BgOpacitySlider != null)
+                OpacityVal.Text = ((int)Math.Round(BgOpacitySlider.Value * 100)) + "%";
+
+            if (!_loaded) return;
+            ApplyOverlayStyle();
+            SaveConfig();
+        }
+
+        private void IntervalSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            int ms = (int)Math.Round(IntervalSlider.Value / 50.0) * 50;
+            if (IntervalVal != null)
+                IntervalVal.Text = ms + " мс";
+
+            if (!_loaded) return;
+            _timer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, ms));
+            SaveConfig();
+        }
+
+        // ---------- цвет ----------
+
+        private void BuildSwatches()
+        {
+            ColorSwatches.Children.Clear();
+            _swatches.Clear();
+
+            foreach (string name in ColorNames)
+            {
+                var b = new Border
+                {
+                    Width = 24,
+                    Height = 24,
+                    CornerRadius = new CornerRadius(6),
+                    Background = new SolidColorBrush(ParseColor(name)),
+                    Margin = new Thickness(0, 0, 8, 8),
+                    Cursor = Cursors.Hand,
+                    BorderBrush = Brushes.Transparent,
+                    BorderThickness = new Thickness(2),
+                    Tag = name,
+                    ToolTip = name
+                };
+                b.MouseLeftButtonUp += Swatch_Click;
+                _swatches.Add(b);
+                ColorSwatches.Children.Add(b);
+            }
+        }
+
+        private void Swatch_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is Border b && b.Tag is string name)
+            {
+                _selectedColorName = name;
+                HighlightSwatch(name);
+                if (_loaded)
+                {
+                    ApplyOverlayStyle();
+                    SaveConfig();
+                }
+            }
+        }
+
+        private void HighlightSwatch(string name)
+        {
+            Brush ring = new SolidColorBrush(Color.FromRgb(0x4C, 0x8F, 0xD6));
+            foreach (Border b in _swatches)
+                b.BorderBrush = (b.Tag as string) == name ? ring : Brushes.Transparent;
         }
 
         // ---------- оверлей ----------
@@ -265,6 +317,7 @@ namespace FreeMon
 
                 _overlay.Show();
                 ApplyOverlayStyle();
+                _overlay.SetFpsVisible(_fpsEnabled);
                 _overlay.RestorePosition(_config.OverlayLeft, _config.OverlayTop);
                 _overlay.SetLocked(LockCheck.IsChecked == true);
                 _overlay.RefreshList();
@@ -285,17 +338,8 @@ namespace FreeMon
             if (_overlay is null)
                 return;
 
-            Color color = ParseColor((string)(ColorBox.SelectedItem ?? "Lime"));
+            Color color = ParseColor(_selectedColorName);
             _overlay.ApplyStyle(FontSizeSlider.Value, color, BgOpacitySlider.Value);
-        }
-
-        private void OverlayStyleChanged(object sender, EventArgs e)
-        {
-            if (!_loaded)
-                return;
-
-            ApplyOverlayStyle();
-            SaveConfig();
         }
 
         private void LockCheck_Changed(object sender, RoutedEventArgs e)
@@ -316,56 +360,84 @@ namespace FreeMon
                     return color;
             }
             catch { }
-            return Colors.Lime;
+            return Colors.White;
         }
 
         // ---------- настройки ----------
 
         private void PreselectDefaults()
         {
-            void Pick(Func<SensorItem, bool> predicate)
+            void Sel(string hw, SensorType t, int count = 1, string? prefer = null)
             {
-                SensorItem? s = _all.FirstOrDefault(predicate);
-                if (s != null)
-                    s.IsSelected = true;
+                int c = 0;
+
+                if (prefer != null)
+                {
+                    SensorItem? p = _all.FirstOrDefault(s =>
+                        s.HardwareType.Contains(hw) && s.SensorType == t && s.Name.Contains(prefer));
+                    if (p != null) { p.IsSelected = true; c++; }
+                }
+
+                foreach (SensorItem s in _all)
+                {
+                    if (c >= count) break;
+                    if (s.HardwareType.Contains(hw) && s.SensorType == t && !s.IsSelected)
+                    {
+                        s.IsSelected = true;
+                        c++;
+                    }
+                }
             }
 
-            Pick(s => s.HardwareType.Contains("Cpu") && s.SensorType == SensorType.Temperature);
-            Pick(s => s.HardwareType.Contains("Cpu") && s.SensorType == SensorType.Load
-                      && s.Name.Contains("Total"));
-            Pick(s => s.HardwareType.Contains("Gpu") && s.SensorType == SensorType.Temperature);
-            Pick(s => s.HardwareType.Contains("Gpu") && s.SensorType == SensorType.Load);
-            Pick(s => s.HardwareType.Contains("Memory") && s.SensorType == SensorType.Load);
+            // Видеокарта
+            Sel("Gpu", SensorType.Load);
+            Sel("Gpu", SensorType.Temperature);
+            Sel("Gpu", SensorType.Clock, 2);
+            Sel("Gpu", SensorType.Power);
+            Sel("Gpu", SensorType.SmallData);
+
+            // Процессор
+            Sel("Cpu", SensorType.Load, 1, "Total");
+            Sel("Cpu", SensorType.Temperature, 1, "Package");
+            Sel("Cpu", SensorType.Clock, 2);
+            Sel("Cpu", SensorType.Power, 1, "Package");
+
+            // Оперативная память
+            Sel("Memory", SensorType.Data, 1, "Used");
+            Sel("Memory", SensorType.Load);
         }
 
         private void ApplyConfig()
         {
-            IntervalBox.Text = _config.IntervalMs.ToString();
-            FontSizeSlider.Value = _config.FontSize;
-            BgOpacitySlider.Value = _config.BackgroundOpacity;
+            FontSizeSlider.Value = Clamp(_config.FontSize, 11, 24);
+            BgOpacitySlider.Value = Clamp(_config.BackgroundOpacity, 0.2, 1.0);
+            IntervalSlider.Value = Clamp(_config.IntervalMs, 200, 2000);
 
-            ColorBox.SelectedItem = _config.TextColor;
-            if (ColorBox.SelectedItem == null)
-                ColorBox.SelectedItem = "Lime";
+            _selectedColorName = ColorNames.Contains(_config.TextColor) ? _config.TextColor : "White";
+            HighlightSwatch(_selectedColorName);
 
             LockCheck.IsChecked = _config.Locked;
             FpsCheck.IsChecked = _config.FpsEnabled;
+
+            FontVal.Text = ((int)Math.Round(FontSizeSlider.Value)).ToString();
+            OpacityVal.Text = ((int)Math.Round(BgOpacitySlider.Value * 100)) + "%";
+            IntervalVal.Text = ((int)Math.Round(IntervalSlider.Value)) + " мс";
 
             var set = new HashSet<string>(_config.SelectedSensorIds);
             foreach (SensorItem s in _all)
                 s.IsSelected = set.Contains(s.Id);
         }
 
+        private static double Clamp(double v, double lo, double hi)
+            => v < lo ? lo : (v > hi ? hi : v);
+
         private void SaveConfig()
         {
             _config.SelectedSensorIds = _all.Where(s => s.IsSelected).Select(s => s.Id).ToList();
-
-            if (int.TryParse(IntervalBox.Text, out int ms))
-                _config.IntervalMs = ms;
-
+            _config.IntervalMs = (int)Math.Round(IntervalSlider.Value);
             _config.FontSize = FontSizeSlider.Value;
             _config.BackgroundOpacity = BgOpacitySlider.Value;
-            _config.TextColor = (string)(ColorBox.SelectedItem ?? "Lime");
+            _config.TextColor = _selectedColorName;
             _config.Locked = LockCheck.IsChecked == true;
             _config.FpsEnabled = FpsCheck.IsChecked == true;
 
