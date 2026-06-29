@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using FreeMon.Interop;
 using FreeMon.Models;
 
@@ -27,6 +28,10 @@ namespace FreeMon
         private bool _fpsVisible;
         private int _dotTick;
 
+        // Периодически поднимает оверлей поверх всех окон (для игр «без рамки»)
+        private readonly DispatcherTimer _topmost =
+            new() { Interval = TimeSpan.FromMilliseconds(700) };
+
         private static readonly Brush MutedBrush =
             new SolidColorBrush(Color.FromRgb(0x86, 0x8C, 0x95));
 
@@ -44,7 +49,12 @@ namespace FreeMon
             SourceInitialized += (_, _) =>
             {
                 if (_locked) NativeMethods.SetClickThrough(this, true);
+                NativeMethods.ForceTopMost(this);
+                _topmost.Tick += (_, _) => NativeMethods.ForceTopMost(this);
+                _topmost.Start();
             };
+
+            Closed += (_, _) => _topmost.Stop();
         }
 
         // ---------- построение списка ----------

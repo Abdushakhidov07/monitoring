@@ -23,6 +23,30 @@ namespace FreeMon.Interop
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+            int X, int Y, int cx, int cy, uint uFlags);
+
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+
+        /// <summary>
+        /// Принудительно поднимает окно на самый верх «поверх всех» —
+        /// без кражи фокуса. Помогает, когда другое topmost-окно (например,
+        /// игра в режиме «без рамки») перекрывает оверлей.
+        /// </summary>
+        public static void ForceTopMost(Window window)
+        {
+            IntPtr hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero)
+                return;
+
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+
         /// <summary>
         /// Делает окно «прозрачным» для мыши (клики проходят сквозь него)
         /// или возвращает обычное поведение.
