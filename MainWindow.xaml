@@ -1,0 +1,86 @@
+<Window x:Class="FreeMon.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FreeMon — мониторинг железа"
+        Height="660" Width="940"
+        WindowStartupLocation="CenterScreen"
+        Background="#FF1E1E1E">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Верхняя панель -->
+        <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,8">
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <TextBlock Text="Поиск:" Foreground="White" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="SearchBox" Width="220" Height="26" VerticalContentAlignment="Center"
+                         TextChanged="SearchBox_TextChanged"/>
+                <Button x:Name="ToggleOverlayBtn" Content="Показать оверлей" Width="160" Height="26"
+                        Margin="10,0,0,0" Click="ToggleOverlayBtn_Click"/>
+                <Button Content="Снять все галочки" Width="150" Height="26"
+                        Margin="8,0,0,0" Click="ClearSelection_Click"/>
+                <TextBlock Text="Интервал, мс:" Foreground="White" VerticalAlignment="Center" Margin="16,0,4,0"/>
+                <TextBox x:Name="IntervalBox" Width="60" Height="26" VerticalContentAlignment="Center"
+                         Text="1000" LostFocus="IntervalBox_LostFocus"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal">
+                <CheckBox x:Name="FpsCheck" Content="Считать FPS активного окна"
+                          Foreground="White" VerticalAlignment="Center"
+                          Checked="FpsCheck_Changed" Unchecked="FpsCheck_Changed"/>
+                <TextBlock x:Name="FpsStatus" Text="FPS выключен" Foreground="#FFB0B0B0"
+                           VerticalAlignment="Center" Margin="14,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Таблица датчиков -->
+        <DataGrid x:Name="SensorGrid" Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  Background="#FF252526" Foreground="White"
+                  RowBackground="#FF252526" AlternatingRowBackground="#FF2D2D30"
+                  BorderBrush="#FF3F3F46" SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Оверлей" Width="70"
+                    Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"/>
+                <DataGridTextColumn Header="Устройство" Width="230" IsReadOnly="True"
+                    Binding="{Binding HardwareName}"/>
+                <DataGridTextColumn Header="Тип" Width="100" IsReadOnly="True"
+                    Binding="{Binding HardwareType}"/>
+                <DataGridTextColumn Header="Датчик" Width="210" IsReadOnly="True"
+                    Binding="{Binding Name}"/>
+                <DataGridTextColumn Header="Категория" Width="110" IsReadOnly="True"
+                    Binding="{Binding TypeName}"/>
+                <DataGridTextColumn Header="Значение" Width="130" IsReadOnly="True"
+                    Binding="{Binding Pretty}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Оформление оверлея -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Шрифт:" Foreground="White" VerticalAlignment="Center"/>
+            <Slider x:Name="FontSizeSlider" Width="110" Minimum="10" Maximum="40" Value="16"
+                    VerticalAlignment="Center" Margin="4,0,12,0" ValueChanged="OverlayStyleChanged"/>
+
+            <TextBlock Text="Цвет:" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox x:Name="ColorBox" Width="110" Margin="4,0,12,0"
+                      SelectionChanged="OverlayStyleChanged"/>
+
+            <TextBlock Text="Фон:" Foreground="White" VerticalAlignment="Center"/>
+            <Slider x:Name="BgOpacitySlider" Width="110" Minimum="0" Maximum="1" Value="0.5"
+                    VerticalAlignment="Center" Margin="4,0,12,0" ValueChanged="OverlayStyleChanged"/>
+
+            <CheckBox x:Name="LockCheck" Content="Зафиксировать (клик сквозь)"
+                      Foreground="White" VerticalAlignment="Center"
+                      Checked="LockCheck_Changed" Unchecked="LockCheck_Changed"/>
+        </StackPanel>
+    </Grid>
+</Window>
